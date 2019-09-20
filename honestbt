@@ -27,6 +27,7 @@ import time
 import argparse
 import shlex
 import os
+import mmap
 
 try:
     random_sys = random.SystemRandom()
@@ -109,6 +110,37 @@ def parse_args(argv=None):
         parser.error('Key must be 128, 192 or 256 bits')
 
     return args
+
+
+class FileMmap:
+    def __init__(self, filename, block_size=262144):
+        self.block_size = block_size
+        if hasattr(os, 'O_DIRECT'):
+            flags = os.O_DIRECT | os.O_RDWR
+        else:
+            flags = os.O_RDWR
+        self.fileno = os.open(filename, flags)
+        self.file_size = os.lseek(self.fileno, 0, os.SEEK_END) - 1
+        os.lseek(self.fileno, 0, os.SEEK_SET)
+        self.mmap = mmap.mmap(-1, block_size)
+
+    def seek(self, pos, how=os.SEEK_SET):
+        return os.lseek(self.fileno, pos, how)
+
+    def write(self, data):
+        assert len(data) == self.block_size
+        self.mmap.seek(0)
+        self.mmap.write(data)
+        return os.write(self.fileno, self.mmap)
+
+    def read(self):
+        self.mmap.seek(0)
+        os.readv(self.fileno, [self.mmap])
+        self.mmap.seek(0)
+        return self.mmap.read()
+
+    def flush(self):
+        return os.fsync(self.fileno)
 
 
 class HonestBT:
@@ -250,7 +282,7 @@ class HonestBT:
             time_now = time.time()
             if self.args.fake_rollover_blocks:
                 self.fh.seek((self.args.beginning_block + ((self.raw_block_pos - self.args.beginning_block) % self.args.fake_rollover_blocks)) * self.args.block_size)
-            r = self.fh.read(self.args.block_size)
+            r = self.fh.read()
             decrypted = cipher.decrypt(r)
 
             if self.blockpattern != decrypted:
@@ -301,23 +333,23 @@ class HonestBT:
                 ) for _ in range(self.args.write_bad_bytes)
             ]
         for bad_block, bad_block_byte in sorted(bad_blocks, key=lambda x: (x[0], x[1])):
-            bad_seek = (bad_block * self.args.block_size) + bad_block_byte
-            self.fh.seek(bad_seek)
             bad_int = random_sys.randint(0, 255)
-            self.fh.write(bytes([bad_int]))
-            print('FUZZ: Wrote bad byte ({:02x}) to block {} byte {} (absolute seek pos {})'.format(
-                bad_int, bad_block, bad_block_byte, bad_seek,
+            self.fh.seek(bad_block * self.args.block_size)
+            buf = bytearray(self.fh.read())
+            buf[bad_block_byte] = bad_int
+            self.fh.write(buf)
+            print('FUZZ: Wrote bad byte ({:02x}) to block {} byte {}'.format(
+                bad_int, bad_block, bad_block_byte,
             ))
             self.fh.flush()
 
     def main(self):
         print('Testing {}'.format(self.args.device))
 
-        self.fh = open(self.args.device, 'rb+')
+        self.fh = FileMmap(self.args.device, self.args.block_size)
 
         if not self.args.ending_block:
-            self.args.ending_block = int((os.lseek(self.fh.fileno(), 0, os.SEEK_END) - 1) / self.args.block_size)
-            os.lseek(self.fh.fileno(), 0, os.SEEK_SET)
+            self.args.ending_block = int(self.fh.file_size / self.args.block_size)
         if not self.args.ending_block:
             self.args.parser.error(
                 'Cannot determine to block device size, specify --ending-block of {} byte blocks'.format(
