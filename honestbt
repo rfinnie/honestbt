@@ -79,7 +79,7 @@ def parse_args(argv=None):
         '--ending-block', type=int, default=0,
     )
     parser.add_argument(
-        '--block-size', type=int, default=4096,
+        '--block-size', type=int, default=262144,
     )
     parser.add_argument(
         '--resume-write-block', type=int, default=-1,
