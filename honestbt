@@ -41,16 +41,16 @@ def is_pow2(n):
 
 def prettyb(number, mode=1000, precision=2):
     if mode == 1024:
-        tags = ['', 'Ki', 'Mi', 'Gi', 'Ti']
+        tags = ["", "Ki", "Mi", "Gi", "Ti"]
         divide = 1024
     else:
-        tags = ['', 'K', 'M', 'G', 'T']
+        tags = ["", "K", "M", "G", "T"]
         divide = 1000
     attag = 0
     while number >= divide:
         number = number / divide
         attag += 1
-    return '{{:0.0{}f}}{{}}'.format(precision).format(number, tags[attag])
+    return "{{:0.0{}f}}{{}}".format(precision).format(number, tags[attag])
 
 
 def parse_args(argv=None):
@@ -58,48 +58,28 @@ def parse_args(argv=None):
         argv = sys.argv
 
     parser = argparse.ArgumentParser(
-        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter
     )
 
     # Positionals
-    parser.add_argument(
-        'device', type=str, default=None,
-    )
+    parser.add_argument("device", type=str, default=None)
 
     # Options
-    parser.add_argument(
-        '--key', type=str,
-    )
-    parser.add_argument(
-        '--write-bad-bytes', type=int, default=0,
-    )
-    parser.add_argument(
-        '--beginning-block', type=int, default=0,
-    )
-    parser.add_argument(
-        '--ending-block', type=int, default=0,
-    )
-    parser.add_argument(
-        '--block-size', type=int, default=262144,
-    )
-    parser.add_argument(
-        '--resume-write-block', type=int, default=-1,
-    )
-    parser.add_argument(
-        '--resume-test-block', type=int, default=-1,
-    )
-    parser.add_argument(
-        '--fake-rollover-blocks', type=int, default=0,
-    )
-    parser.add_argument(
-        '--fake-zeroed-blocks', type=int, default=0,
-    )
+    parser.add_argument("--key", type=str)
+    parser.add_argument("--write-bad-bytes", type=int, default=0)
+    parser.add_argument("--beginning-block", type=int, default=0)
+    parser.add_argument("--ending-block", type=int, default=0)
+    parser.add_argument("--block-size", type=int, default=262144)
+    parser.add_argument("--resume-write-block", type=int, default=-1)
+    parser.add_argument("--resume-test-block", type=int, default=-1)
+    parser.add_argument("--fake-rollover-blocks", type=int, default=0)
+    parser.add_argument("--fake-zeroed-blocks", type=int, default=0)
 
     args = parser.parse_args(args=argv[1:])
     args.parser = parser
 
     if (args.block_size < 16) or (not is_pow2(args.block_size)):
-        parser.error('Block size must be a power of two, 16 bytes or more')
+        parser.error("Block size must be a power of two, 16 bytes or more")
 
     if args.key:
         args.key = base64.b64decode(args.key)
@@ -107,7 +87,7 @@ def parse_args(argv=None):
         args.key = bytes([random_sys.randint(0, 255) for _ in range(32)])
 
     if (len(args.key) * 8) not in (128, 192, 256):
-        parser.error('Key must be 128, 192 or 256 bits')
+        parser.error("Key must be 128, 192 or 256 bits")
 
     return args
 
@@ -115,7 +95,7 @@ def parse_args(argv=None):
 class FileMmap:
     def __init__(self, filename, block_size=262144):
         self.block_size = block_size
-        if hasattr(os, 'O_DIRECT'):
+        if hasattr(os, "O_DIRECT"):
             flags = os.O_DIRECT | os.O_RDWR
         else:
             flags = os.O_RDWR
@@ -153,43 +133,54 @@ class HonestBT:
 
     def print_resume(self, type):
         pairs = [
-            ('--key', base64.b64encode(self.args.key).decode('UTF-8')),
-            ('--resume-{}-block'.format(type), self.raw_block_pos),
+            ("--key", base64.b64encode(self.args.key).decode("UTF-8")),
+            ("--resume-{}-block".format(type), self.raw_block_pos),
         ]
         for k, a in [
-            ('--block-size', 'block_size'),
-            ('--beginning-block', 'beginning_block'),
-            ('--ending-block', 'ending_block'),
-            ('--fake-rollover-blocks', 'fake_rollover_blocks'),
-            ('--fake-zeroed-blocks', 'fake_zeroed_blocks'),
-            ('--write-bad-bytes', 'write_bad_bytes'),
+            ("--block-size", "block_size"),
+            ("--beginning-block", "beginning_block"),
+            ("--ending-block", "ending_block"),
+            ("--fake-rollover-blocks", "fake_rollover_blocks"),
+            ("--fake-zeroed-blocks", "fake_zeroed_blocks"),
+            ("--write-bad-bytes", "write_bad_bytes"),
         ]:
             v = getattr(self.args, a)
             if v == self.args.parser.get_default(a):
                 continue
             pairs.append((k, v))
         print()
-        print('To resume:')
-        print('{} {} {}'.format(
-            shlex.quote(sys.argv[0]),
-            ' '.join([shlex.quote('{}={}'.format(k, v)) for k, v in pairs]),
-            shlex.quote(self.args.device),
-        ))
+        print("To resume:")
+        print(
+            "{} {} {}".format(
+                shlex.quote(sys.argv[0]),
+                " ".join([shlex.quote("{}={}".format(k, v)) for k, v in pairs]),
+                shlex.quote(self.args.device),
+            )
+        )
         sys.exit(0)
 
     def write_blocks(self):
         if self.args.resume_test_block >= 0:
-            print('Skipping write')
+            print("Skipping write")
             return
 
-        print('Writing')
+        print("Writing")
 
         self.raw_block_pos = 0
         if self.args.beginning_block:
-            print('Beginning at block {} ({}B), as requested'.format(self.args.beginning_block, prettyb(self.args.beginning_block * self.args.block_size, 1024)))
+            print(
+                "Beginning at block {} ({}B), as requested".format(
+                    self.args.beginning_block,
+                    prettyb(self.args.beginning_block * self.args.block_size, 1024),
+                )
+            )
             self.raw_block_pos = self.args.beginning_block
         if self.args.resume_write_block >= 0:
-            print('Resuming write at block {}, as requested'.format(self.args.resume_write_block))
+            print(
+                "Resuming write at block {}, as requested".format(
+                    self.args.resume_write_block
+                )
+            )
             self.raw_block_pos = self.args.resume_write_block
         self.fh.seek(self.raw_block_pos * self.args.block_size)
 
@@ -199,63 +190,110 @@ class HonestBT:
         except IOError as e:
             print()
             print(str(e))
-            self.print_resume('write')
+            self.print_resume("write")
             raise
         except KeyboardInterrupt:
             user_interrupted = True
             print()
 
-        print('Flushing')
+        print("Flushing")
         self.fh.flush()
-        print('Successfully wrote {} blocks of {} bytes'.format(self.blocks_written, self.args.block_size))
+        print(
+            "Successfully wrote {} blocks of {} bytes".format(
+                self.blocks_written, self.args.block_size
+            )
+        )
         if user_interrupted:
-            self.print_resume('write')
+            self.print_resume("write")
 
     def write_blocks_loop(self):
-        initial_value = self.raw_block_pos * int(self.args.block_size / self.cipher_block_size)
-        cipher = AES.new(self.args.key, AES.MODE_CTR, counter=Counter.new(128, initial_value=initial_value))
+        initial_value = self.raw_block_pos * int(
+            self.args.block_size / self.cipher_block_size
+        )
+        cipher = AES.new(
+            self.args.key,
+            AES.MODE_CTR,
+            counter=Counter.new(128, initial_value=initial_value),
+        )
         time_write_begin = time.time()
         time_last_print = time_write_begin
         blocks_last_print = 0
 
         while True:
             encrypted = cipher.encrypt(self.blockpattern)
-            if self.args.fake_zeroed_blocks and self.raw_block_pos >= (self.args.fake_zeroed_blocks + self.args.beginning_block):
+            if self.args.fake_zeroed_blocks and self.raw_block_pos >= (
+                self.args.fake_zeroed_blocks + self.args.beginning_block
+            ):
                 encrypted = bytes(self.args.block_size)
             if self.args.fake_rollover_blocks:
-                self.fh.seek((self.args.beginning_block + ((self.raw_block_pos - self.args.beginning_block) % self.args.fake_rollover_blocks)) * self.args.block_size)
+                self.fh.seek(
+                    (
+                        self.args.beginning_block
+                        + (
+                            (self.raw_block_pos - self.args.beginning_block)
+                            % self.args.fake_rollover_blocks
+                        )
+                    )
+                    * self.args.block_size
+                )
             self.fh.write(encrypted)
             self.blocks_written += 1
             if self.raw_block_pos == self.args.ending_block:
                 break
             time_now = time.time()
             if time_now >= (time_last_print + 1):
-                print('\r{} blocks written, {}B, {}B/s        '.format(
-                    self.blocks_written,
-                    prettyb(self.blocks_written * self.args.block_size, 1024),
-                    prettyb(((self.blocks_written - blocks_last_print) * self.args.block_size) / (time_now - time_last_print), 1024),
-                ), end='')
+                print(
+                    "\r{} blocks written, {}B, {}B/s        ".format(
+                        self.blocks_written,
+                        prettyb(self.blocks_written * self.args.block_size, 1024),
+                        prettyb(
+                            (
+                                (self.blocks_written - blocks_last_print)
+                                * self.args.block_size
+                            )
+                            / (time_now - time_last_print),
+                            1024,
+                        ),
+                    ),
+                    end="",
+                )
                 sys.stdout.flush()
                 time_last_print = time_now
                 blocks_last_print = self.blocks_written
             self.raw_block_pos += 1
-        print('\r{} blocks written, {}B, {}B/s        '.format(
-            self.blocks_written,
-            prettyb(self.blocks_written * self.args.block_size, 1024),
-            prettyb((self.blocks_written * self.args.block_size) / (time.time() - time_write_begin), 1024),
-        ), end='')
+        print(
+            "\r{} blocks written, {}B, {}B/s        ".format(
+                self.blocks_written,
+                prettyb(self.blocks_written * self.args.block_size, 1024),
+                prettyb(
+                    (self.blocks_written * self.args.block_size)
+                    / (time.time() - time_write_begin),
+                    1024,
+                ),
+            ),
+            end="",
+        )
         print()
 
     def test_blocks(self):
-        print('Testing')
+        print("Testing")
 
         self.raw_block_pos = 0
 
         if self.args.beginning_block:
-            print('Beginning at block {} ({}B), as requested'.format(self.args.beginning_block, prettyb(self.args.beginning_block * self.args.block_size, 1024)))
+            print(
+                "Beginning at block {} ({}B), as requested".format(
+                    self.args.beginning_block,
+                    prettyb(self.args.beginning_block * self.args.block_size, 1024),
+                )
+            )
             self.raw_block_pos = self.args.beginning_block
         if self.args.resume_test_block >= 0:
-            print('Resuming test at block {}, as requested'.format(self.args.resume_test_block))
+            print(
+                "Resuming test at block {}, as requested".format(
+                    self.args.resume_test_block
+                )
+            )
             self.raw_block_pos = self.args.resume_test_block
         self.fh.seek(self.raw_block_pos * self.args.block_size)
 
@@ -264,16 +302,22 @@ class HonestBT:
         except IOError as e:
             print()
             print(str(e))
-            self.print_resume('test')
+            self.print_resume("test")
             raise
         except KeyboardInterrupt:
             print()
-            self.print_resume('test')
+            self.print_resume("test")
 
     def test_blocks_loop(self):
         check_differ_pos = 0
-        initial_value = self.raw_block_pos * int(self.args.block_size / self.cipher_block_size)
-        cipher = AES.new(self.args.key, AES.MODE_CTR, counter=Counter.new(128, initial_value=initial_value))
+        initial_value = self.raw_block_pos * int(
+            self.args.block_size / self.cipher_block_size
+        )
+        cipher = AES.new(
+            self.args.key,
+            AES.MODE_CTR,
+            counter=Counter.new(128, initial_value=initial_value),
+        )
         time_test_begin = time.time()
         time_last_print = time_test_begin
         blocks_last_print = 0
@@ -281,7 +325,16 @@ class HonestBT:
         while True:
             time_now = time.time()
             if self.args.fake_rollover_blocks:
-                self.fh.seek((self.args.beginning_block + ((self.raw_block_pos - self.args.beginning_block) % self.args.fake_rollover_blocks)) * self.args.block_size)
+                self.fh.seek(
+                    (
+                        self.args.beginning_block
+                        + (
+                            (self.raw_block_pos - self.args.beginning_block)
+                            % self.args.fake_rollover_blocks
+                        )
+                    )
+                    * self.args.block_size
+                )
             r = self.fh.read()
             decrypted = cipher.decrypt(r)
 
@@ -292,13 +345,19 @@ class HonestBT:
                     for i2 in range(len(self.blockpattern)):
                         if self.blockpattern[i2] != decrypted[i2]:
                             differ_count += 1
-                    print('Block {} is bad ({} byte(s) differ)'.format(self.raw_block_pos, differ_count))
+                    print(
+                        "Block {} is bad ({} byte(s) differ)".format(
+                            self.raw_block_pos, differ_count
+                        )
+                    )
                     if differ_count > (self.args.block_size * 0.9):
                         check_differ_pos += 1
                     if check_differ_pos >= 10:
-                        print('Many completely different comparisons, giving up on checking byte differences for now')
+                        print(
+                            "Many completely different comparisons, giving up on checking byte differences for now"
+                        )
                 else:
-                    print('Block {} is bad'.format(self.raw_block_pos))
+                    print("Block {} is bad".format(self.raw_block_pos))
             else:
                 if check_differ_pos > 0:
                     check_differ_pos -= 1
@@ -307,20 +366,37 @@ class HonestBT:
             if self.raw_block_pos == self.args.ending_block:
                 break
             if time_now >= (time_last_print + 1):
-                print('\r{} blocks tested, {}B, {}B/s        '.format(
-                    self.blocks_tested,
-                    prettyb(self.blocks_tested * self.args.block_size, 1024),
-                    prettyb(((self.blocks_tested - blocks_last_print) * self.args.block_size) / (time_now - time_last_print), 1024),
-                ), end='')
+                print(
+                    "\r{} blocks tested, {}B, {}B/s        ".format(
+                        self.blocks_tested,
+                        prettyb(self.blocks_tested * self.args.block_size, 1024),
+                        prettyb(
+                            (
+                                (self.blocks_tested - blocks_last_print)
+                                * self.args.block_size
+                            )
+                            / (time_now - time_last_print),
+                            1024,
+                        ),
+                    ),
+                    end="",
+                )
                 sys.stdout.flush()
                 time_last_print = time_now
                 blocks_last_print = self.blocks_tested
             self.raw_block_pos += 1
-        print('\r{} blocks tested, {}B, {}B/s        '.format(
-            self.blocks_tested,
-            prettyb(self.blocks_tested * self.args.block_size, 1024),
-            prettyb((self.blocks_tested * self.args.block_size) / (time.time() - time_test_begin), 1024),
-        ), end='')
+        print(
+            "\r{} blocks tested, {}B, {}B/s        ".format(
+                self.blocks_tested,
+                prettyb(self.blocks_tested * self.args.block_size, 1024),
+                prettyb(
+                    (self.blocks_tested * self.args.block_size)
+                    / (time.time() - time_test_begin),
+                    1024,
+                ),
+            ),
+            end="",
+        )
         print()
 
     def fuzz_blocks(self):
@@ -328,7 +404,8 @@ class HonestBT:
             (
                 random_sys.randint(self.args.beginning_block, self.args.ending_block),
                 random_sys.randint(0, 255),
-            ) for _ in range(self.args.write_bad_bytes)
+            )
+            for _ in range(self.args.write_bad_bytes)
         ]
         for bad_block, bad_block_byte in sorted(bad_blocks, key=lambda x: (x[0], x[1])):
             self.fh.seek(bad_block * self.args.block_size)
@@ -336,13 +413,15 @@ class HonestBT:
             orig_byte = buf[bad_block_byte]
             buf[bad_block_byte] ^= 2 ** random.randint(0, 7)
             self.fh.write(buf)
-            print('FUZZ: Wrote bad byte ({:02x} -> {:02x}) to block {} byte {}'.format(
-                orig_byte, buf[bad_block_byte], bad_block, bad_block_byte,
-            ))
+            print(
+                "FUZZ: Wrote bad byte ({:02x} -> {:02x}) to block {} byte {}".format(
+                    orig_byte, buf[bad_block_byte], bad_block, bad_block_byte
+                )
+            )
         self.fh.flush()
 
     def main(self):
-        print('Testing {}'.format(self.args.device))
+        print("Testing {}".format(self.args.device))
 
         self.fh = FileMmap(self.args.device, self.args.block_size)
 
@@ -350,17 +429,19 @@ class HonestBT:
             self.args.ending_block = int(self.fh.file_size / self.args.block_size)
         if not self.args.ending_block:
             self.args.parser.error(
-                'Cannot determine to block device size, specify --ending-block of {} byte blocks'.format(
+                "Cannot determine to block device size, specify --ending-block of {} byte blocks".format(
                     self.args.block_size
                 )
             )
 
-        print('Key: {}'.format(base64.b64encode(self.args.key).decode('UTF-8')))
-        print('Block size: {} bytes'.format(self.args.block_size))
-        print('Beginning block: {}'.format(self.args.beginning_block))
-        print('Ending block: {}'.format(self.args.ending_block))
+        print("Key: {}".format(base64.b64encode(self.args.key).decode("UTF-8")))
+        print("Block size: {} bytes".format(self.args.block_size))
+        print("Beginning block: {}".format(self.args.beginning_block))
+        print("Ending block: {}".format(self.args.ending_block))
 
-        self.cipher_block_size = AES.new(self.args.key, AES.MODE_CTR, counter=Counter.new(128)).block_size
+        self.cipher_block_size = AES.new(
+            self.args.key, AES.MODE_CTR, counter=Counter.new(128)
+        ).block_size
 
         self.write_blocks()
         if self.args.write_bad_bytes:
@@ -368,6 +449,6 @@ class HonestBT:
         self.test_blocks()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     honestbt = HonestBT()
     honestbt.main()
