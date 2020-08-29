@@ -18,16 +18,24 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
 # 02110-1301, USA.
 
-from Crypto.Cipher import AES
-from Crypto.Util import Counter
-import random
-import sys
-import base64
-import time
 import argparse
-import shlex
-import os
+import base64
 import mmap
+import os
+import random
+import shlex
+import sys
+import time
+
+try:
+    from Cryptodome.Cipher import AES
+except ImportError:
+    from Crypto.Cipher import AES
+
+try:
+    from Cryptodome.Util import Counter
+except ImportError:
+    from Crypto.Util import Counter
 
 try:
     random_sys = random.SystemRandom()
