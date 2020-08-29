@@ -324,24 +324,22 @@ class HonestBT:
         print()
 
     def fuzz_blocks(self):
-        bad_blocks = []
-        if self.args.write_bad_bytes:
-            bad_blocks = [
-                (
-                    random_sys.randint(self.args.beginning_block, self.args.ending_block),
-                    random_sys.randint(0, 255),
-                ) for _ in range(self.args.write_bad_bytes)
-            ]
+        bad_blocks = [
+            (
+                random_sys.randint(self.args.beginning_block, self.args.ending_block),
+                random_sys.randint(0, 255),
+            ) for _ in range(self.args.write_bad_bytes)
+        ]
         for bad_block, bad_block_byte in sorted(bad_blocks, key=lambda x: (x[0], x[1])):
-            bad_int = random_sys.randint(0, 255)
             self.fh.seek(bad_block * self.args.block_size)
             buf = bytearray(self.fh.read())
-            buf[bad_block_byte] = bad_int
+            orig_byte = buf[bad_block_byte]
+            buf[bad_block_byte] ^= 2 ** random.randint(0, 7)
             self.fh.write(buf)
-            print('FUZZ: Wrote bad byte ({:02x}) to block {} byte {}'.format(
-                bad_int, bad_block, bad_block_byte,
+            print('FUZZ: Wrote bad byte ({:02x} -> {:02x}) to block {} byte {}'.format(
+                orig_byte, buf[bad_block_byte], bad_block, bad_block_byte,
             ))
-            self.fh.flush()
+        self.fh.flush()
 
     def main(self):
         print('Testing {}'.format(self.args.device))
@@ -365,7 +363,8 @@ class HonestBT:
         self.cipher_block_size = AES.new(self.args.key, AES.MODE_CTR, counter=Counter.new(128)).block_size
 
         self.write_blocks()
-        self.fuzz_blocks()
+        if self.args.write_bad_bytes:
+            self.fuzz_blocks()
         self.test_blocks()
 
 
