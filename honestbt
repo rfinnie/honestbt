@@ -82,6 +82,7 @@ def parse_args(argv=None):
     parser.add_argument("--resume-test-block", type=int, default=-1)
     parser.add_argument("--fake-rollover-blocks", type=int, default=0)
     parser.add_argument("--fake-zeroed-blocks", type=int, default=0)
+    parser.add_argument("--skip-test", action="store_true")
 
     args = parser.parse_args(args=argv[1:])
     args.parser = parser
@@ -139,10 +140,10 @@ class HonestBT:
         self.blocks_written = 0
         self.blocks_tested = 0
 
-    def print_resume(self, type):
-        pairs = [
-            ("--key", base64.b64encode(self.args.key).decode("UTF-8")),
-            ("--resume-{}-block".format(type), self.raw_block_pos),
+    def print_resume(self, stage):
+        args = [
+            "--key={}".format(base64.b64encode(self.args.key).decode("UTF-8")),
+            "--resume-{}-block={}".format(stage, self.raw_block_pos),
         ]
         for k, a in [
             ("--block-size", "block_size"),
@@ -151,17 +152,21 @@ class HonestBT:
             ("--fake-rollover-blocks", "fake_rollover_blocks"),
             ("--fake-zeroed-blocks", "fake_zeroed_blocks"),
             ("--write-bad-bytes", "write_bad_bytes"),
+            ("--skip-test", "skip_test"),
         ]:
             v = getattr(self.args, a)
             if v == self.args.parser.get_default(a):
                 continue
-            pairs.append((k, v))
+            if type(v) == bool:
+                args.append(k)
+            else:
+                args.append("{}={}".format(k, v))
         print()
         print("To resume:")
         print(
             "{} {} {}".format(
                 shlex.quote(sys.argv[0]),
-                " ".join([shlex.quote("{}={}".format(k, v)) for k, v in pairs]),
+                " ".join([shlex.quote(x) for x in args]),
                 shlex.quote(self.args.device),
             )
         )
@@ -284,6 +289,10 @@ class HonestBT:
         print()
 
     def test_blocks(self):
+        if self.args.skip_test:
+            print("Skipping test")
+            return
+
         print("Testing")
 
         self.raw_block_pos = 0
