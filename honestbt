@@ -251,7 +251,7 @@ class HonestBT:
             time_now = time.time()
             if time_now >= (time_last_print + 1):
                 print(
-                    "\r{} blocks written, {}B, {}B/s        ".format(
+                    "\r\x1b[K{} blocks written, {}B, {}B/s".format(
                         self.blocks_written,
                         prettyb(self.blocks_written * self.args.block_size, 1024),
                         prettyb(
@@ -270,7 +270,7 @@ class HonestBT:
                 blocks_last_print = self.blocks_written
             self.raw_block_pos += 1
         print(
-            "\r{} blocks written, {}B, {}B/s        ".format(
+            "\r\x1b[K{} blocks written, {}B, {}B/s".format(
                 self.blocks_written,
                 prettyb(self.blocks_written * self.args.block_size, 1024),
                 prettyb(
@@ -375,7 +375,7 @@ class HonestBT:
                 break
             if time_now >= (time_last_print + 1):
                 print(
-                    "\r{} blocks tested, {}B, {}B/s        ".format(
+                    "\r\x1b[K{} blocks tested, {}B, {}B/s".format(
                         self.blocks_tested,
                         prettyb(self.blocks_tested * self.args.block_size, 1024),
                         prettyb(
@@ -394,7 +394,7 @@ class HonestBT:
                 blocks_last_print = self.blocks_tested
             self.raw_block_pos += 1
         print(
-            "\r{} blocks tested, {}B, {}B/s        ".format(
+            "\r\x1b[K{} blocks tested, {}B, {}B/s".format(
                 self.blocks_tested,
                 prettyb(self.blocks_tested * self.args.block_size, 1024),
                 prettyb(
