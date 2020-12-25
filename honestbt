@@ -20,12 +20,12 @@
 
 import argparse
 import base64
+import datetime
 import mmap
 import os
 import random
 import shlex
 import sys
-import time
 
 try:
     from Cryptodome.Cipher import AES
@@ -45,6 +45,10 @@ except AttributeError:
 
 def is_pow2(n):
     return (n != 0) and ((n & (n - 1)) == 0)
+
+
+def strip_microseconds(td):
+    return td - datetime.timedelta(microseconds=td.microseconds)
 
 
 def prettyb(number, mode=1000, precision=2):
@@ -287,7 +291,8 @@ class HonestBT:
             AES.MODE_CTR,
             counter=Counter.new(128, initial_value=initial_value),
         )
-        time_write_begin = time.time()
+        time_write_begin = datetime.datetime.now()
+        pos_write_begin = self.pos
         time_last_print = time_write_begin
         pos_last_print = 0
 
@@ -317,32 +322,39 @@ class HonestBT:
             self.pos += block_size
             if self.pos >= self.args.end:
                 break
-            time_now = time.time()
-            if time_now >= (time_last_print + 1):
+            time_now = datetime.datetime.now()
+            if time_now >= (time_last_print + datetime.timedelta(seconds=1)):
+                estimated_end = time_write_begin + datetime.timedelta(
+                    seconds=(time_now - time_write_begin).total_seconds()
+                    / (self.written / (self.args.end - pos_write_begin))
+                )
                 print(
-                    "\x1b[K{}B written ({:.2%}), {}B/s\r".format(
+                    "\x1b[K{}B written ({:.2%}), {}B/s, ~{} left\r".format(
                         prettyb(self.written, 1024),
                         (self.pos - self.args.begin)
                         / (self.args.end - self.args.begin),
                         prettyb(
                             (self.written - pos_last_print)
-                            / (time_now - time_last_print),
+                            / (time_now - time_last_print).total_seconds(),
                             1024,
                         ),
+                        strip_microseconds(estimated_end - time_now),
                     ),
                     end="",
                 )
                 sys.stdout.flush()
                 time_last_print = time_now
                 pos_last_print = self.written
+        time_now = datetime.datetime.now()
         print(
-            "\x1b[K{}B written, {}B/s\r".format(
+            "\x1b[K{}B written, {}B/s in {}".format(
                 prettyb(self.written, 1024),
-                prettyb(self.written / (time.time() - time_write_begin), 1024),
-            ),
-            end="",
+                prettyb(
+                    self.written / (time_now - time_write_begin).total_seconds(), 1024
+                ),
+                strip_microseconds(time_now - time_write_begin),
+            )
         )
-        print()
 
     def test_data(self):
         self.pos = 0
@@ -386,7 +398,8 @@ class HonestBT:
             AES.MODE_CTR,
             counter=Counter.new(128, initial_value=initial_value),
         )
-        time_test_begin = time.time()
+        time_test_begin = datetime.datetime.now()
+        pos_test_begin = self.pos
         time_last_print = time_test_begin
         pos_last_print = 0
 
@@ -421,32 +434,39 @@ class HonestBT:
             self.pos += block_size
             if self.pos >= self.args.end:
                 break
-            time_now = time.time()
-            if time_now >= (time_last_print + 1):
+            time_now = datetime.datetime.now()
+            if time_now >= (time_last_print + datetime.timedelta(seconds=1)):
+                estimated_end = time_test_begin + datetime.timedelta(
+                    seconds=(time_now - time_test_begin).total_seconds()
+                    / (self.tested / (self.args.end - pos_test_begin))
+                )
                 print(
-                    "\x1b[K{}B tested ({:.2%}), {}B/s\r".format(
+                    "\x1b[K{}B tested ({:.2%}), {}B/s, ~{} left\r".format(
                         prettyb(self.tested, 1024),
                         (self.pos - self.args.begin)
                         / (self.args.end - self.args.begin),
                         prettyb(
                             (self.tested - pos_last_print)
-                            / (time_now - time_last_print),
+                            / (time_now - time_last_print).total_seconds(),
                             1024,
                         ),
+                        strip_microseconds(estimated_end - time_now),
                     ),
                     end="",
                 )
                 sys.stdout.flush()
                 time_last_print = time_now
                 pos_last_print = self.tested
+        time_now = datetime.datetime.now()
         print(
-            "\x1b[K{}B tested, {}B/s\r".format(
+            "\x1b[K{}B tested, {}B/s in {}".format(
                 prettyb(self.tested, 1024),
-                prettyb(self.tested / (time.time() - time_test_begin), 1024),
-            ),
-            end="",
+                prettyb(
+                    self.tested / (time_now - time_test_begin).total_seconds(), 1024
+                ),
+                strip_microseconds(time_now - time_test_begin),
+            )
         )
-        print()
 
     def fuzz_data(self, data):
         pct_fraction = self.args.fuzz / 100.0
