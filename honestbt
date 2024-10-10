@@ -281,20 +281,21 @@ class HonestBT:
         pos_write_begin = self.pos
         time_last_print = time_write_begin
         pos_last_print = 0
+        block_size = self.args.block_size
+        zero_buf = bytes(block_size)
 
         while True:
             if (self.pos + self.args.block_size) > self.args.end:
                 block_size = self.args.end - self.pos + 1
-            else:
-                block_size = self.args.block_size
-            encrypted = cipher.encrypt(bytes(block_size))
+                zero_buf = bytes(block_size)
+            encrypted = cipher.encrypt(zero_buf)
 
             if self.args.fuzz:
                 encrypted = self.fuzz_data(encrypted)
             if self.args.fake_zeroed and self.pos >= (
                 self.args.fake_zeroed + self.args.begin
             ):
-                encrypted = bytes(block_size)
+                encrypted = zero_buf
             if self.args.fake_rollover:
                 self.fh.seek(
                     (
@@ -388,12 +389,13 @@ class HonestBT:
         pos_test_begin = self.pos
         time_last_print = time_test_begin
         pos_last_print = 0
+        block_size = self.args.block_size
+        zero_buf = bytes(block_size)
 
         while True:
             if (self.pos + self.args.block_size) > self.args.end:
                 block_size = self.args.end - self.pos + 1
-            else:
-                block_size = self.args.block_size
+                zero_buf = bytes(block_size)
 
             if self.args.fake_rollover:
                 self.fh.seek(
@@ -403,7 +405,7 @@ class HonestBT:
                     )
                 )
             received = self.fh.read()
-            encrypted = cipher.encrypt(bytes(block_size))
+            encrypted = cipher.encrypt(zero_buf)
 
             if encrypted != received:
                 for byte_pos in range(block_size):
