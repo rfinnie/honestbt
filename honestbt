@@ -152,6 +152,8 @@ class FileMmap:
         flags = os.O_RDWR
         if hasattr(os, "O_DIRECT"):
             flags |= os.O_DIRECT
+        if hasattr(os, "O_EXCL"):
+            flags |= os.O_EXCL
         try:
             self.fileno = os.open(filename, flags)
         except OSError as e:
