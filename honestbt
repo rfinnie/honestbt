@@ -48,7 +48,7 @@ def prettyb(number, mode=1000, precision=2):
     while number >= divide:
         number = number / divide
         attag += 1
-    return "{{:0.0{}f}}{{}}".format(precision).format(number, tags[attag])
+    return "{{:0.0{}f}} {{}}".format(precision).format(number, tags[attag])
 
 
 def parse_args(argv=None):
