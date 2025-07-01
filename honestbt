@@ -55,19 +55,13 @@ def parse_args(argv=None):
     if argv is None:
         argv = sys.argv
 
-    parser = argparse.ArgumentParser(
-        formatter_class=argparse.ArgumentDefaultsHelpFormatter
-    )
+    parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
     # Positionals
-    parser.add_argument(
-        "device", type=str, default=None, help="Device or file to destructively test"
-    )
+    parser.add_argument("device", type=str, default=None, help="Device or file to destructively test")
 
     # Options
-    parser.add_argument(
-        "--key", type=str, help="Base64-encoded 128/192/256 bit encryption key"
-    )
+    parser.add_argument("--key", type=str, help="Base64-encoded 128/192/256 bit encryption key")
     parser.add_argument(
         "--fuzz",
         type=float,
@@ -92,9 +86,7 @@ def parse_args(argv=None):
         default=1048576,
         help="I/O block size in bytes, must be multiple of device logical block size",
     )
-    parser.add_argument(
-        "--resume-write", type=int, default=-1, help="Byte to resume write mode"
-    )
+    parser.add_argument("--resume-write", type=int, default=-1, help="Byte to resume write mode")
     parser.add_argument(
         "--resume-test",
         type=int,
@@ -113,9 +105,7 @@ def parse_args(argv=None):
         default=0,
         help="Beginning byte of simulated zeroed data",
     )
-    parser.add_argument(
-        "--skip-test", action="store_true", help="Skip test entirely after write"
-    )
+    parser.add_argument("--skip-test", action="store_true", help="Skip test entirely after write")
 
     args = parser.parse_args(args=argv[1:])
     args.parser = parser
@@ -137,11 +127,7 @@ def parse_args(argv=None):
         if v == parser.get_default(k):
             continue
         if not (v / args.block_size).is_integer():
-            parser.error(
-                "{}={} must be divisible by --block-size={}".format(
-                    f, v, args.block_size
-                )
-            )
+            parser.error("{}={} must be divisible by --block-size={}".format(f, v, args.block_size))
 
     return args
 
@@ -216,7 +202,7 @@ class HonestBT:
             v = getattr(self.args, a)
             if v == self.args.parser.get_default(a):
                 continue
-            if type(v) == bool:
+            if isinstance(v, bool):
                 args.append(k)
             else:
                 args.append("{}={}".format(k, v))
@@ -240,16 +226,10 @@ class HonestBT:
 
         self.pos = 0
         if self.args.begin:
-            print(
-                "Beginning at {}B, as requested".format(prettyb(self.args.begin, 1024))
-            )
+            print("Beginning at {}B, as requested".format(prettyb(self.args.begin, 1024)))
             self.pos = self.args.begin
         if self.args.resume_write >= 0:
-            print(
-                "Resuming write at {}B, as requested".format(
-                    prettyb(self.args.resume_write, 1024)
-                )
-            )
+            print("Resuming write at {}B, as requested".format(prettyb(self.args.resume_write, 1024)))
             self.pos = self.args.resume_write
         self.fh.seek(self.pos)
 
@@ -294,17 +274,10 @@ class HonestBT:
 
             if self.args.fuzz:
                 encrypted = self.fuzz_data(encrypted)
-            if self.args.fake_zeroed and self.pos >= (
-                self.args.fake_zeroed + self.args.begin
-            ):
+            if self.args.fake_zeroed and self.pos >= (self.args.fake_zeroed + self.args.begin):
                 encrypted = zero_buf
             if self.args.fake_rollover:
-                self.fh.seek(
-                    (
-                        self.args.begin
-                        + ((self.pos - self.args.begin) % self.args.fake_rollover)
-                    )
-                )
+                self.fh.seek((self.args.begin + ((self.pos - self.args.begin) % self.args.fake_rollover)))
 
             self.fh.write(encrypted)
             self.written += block_size
@@ -314,17 +287,14 @@ class HonestBT:
             time_now = datetime.datetime.now()
             if time_now >= (time_last_print + datetime.timedelta(seconds=1)):
                 estimated_end = time_write_begin + datetime.timedelta(
-                    seconds=(time_now - time_write_begin).total_seconds()
-                    / (self.written / (self.args.end - pos_write_begin))
+                    seconds=(time_now - time_write_begin).total_seconds() / (self.written / (self.args.end - pos_write_begin))
                 )
                 print(
                     "\x1b[K{}B written ({:.2%}), {}B/s, ~{} left\r".format(
                         prettyb(self.written, 1024),
-                        (self.pos - self.args.begin)
-                        / (self.args.end - self.args.begin),
+                        (self.pos - self.args.begin) / (self.args.end - self.args.begin),
                         prettyb(
-                            (self.written - pos_last_print)
-                            / (time_now - time_last_print).total_seconds(),
+                            (self.written - pos_last_print) / (time_now - time_last_print).total_seconds(),
                             1024,
                         ),
                         strip_microseconds(estimated_end - time_now),
@@ -338,9 +308,7 @@ class HonestBT:
         print(
             "\x1b[K{}B written, {}B/s in {}".format(
                 prettyb(self.written, 1024),
-                prettyb(
-                    self.written / (time_now - time_write_begin).total_seconds(), 1024
-                ),
+                prettyb(self.written / (time_now - time_write_begin).total_seconds(), 1024),
                 strip_microseconds(time_now - time_write_begin),
             )
         )
@@ -356,16 +324,10 @@ class HonestBT:
         print("Testing")
 
         if self.args.begin:
-            print(
-                "Beginning at {}B, as requested".format(prettyb(self.args.begin, 1024))
-            )
+            print("Beginning at {}B, as requested".format(prettyb(self.args.begin, 1024)))
             self.pos = self.args.begin
         if self.args.resume_test >= 0:
-            print(
-                "Resuming test at {}B, as requested".format(
-                    prettyb(self.args.resume_test, 1024)
-                )
-            )
+            print("Resuming test at {}B, as requested".format(prettyb(self.args.resume_test, 1024)))
             self.pos = self.args.resume_test
         self.fh.seek(self.pos)
 
@@ -400,12 +362,7 @@ class HonestBT:
                 zero_buf = bytes(block_size)
 
             if self.args.fake_rollover:
-                self.fh.seek(
-                    (
-                        self.args.begin
-                        + ((self.pos - self.args.begin) % self.args.fake_rollover)
-                    )
-                )
+                self.fh.seek((self.args.begin + ((self.pos - self.args.begin) % self.args.fake_rollover)))
             received = self.fh.read()
             encrypted = cipher.encrypt(zero_buf)
 
@@ -427,17 +384,14 @@ class HonestBT:
             time_now = datetime.datetime.now()
             if time_now >= (time_last_print + datetime.timedelta(seconds=1)):
                 estimated_end = time_test_begin + datetime.timedelta(
-                    seconds=(time_now - time_test_begin).total_seconds()
-                    / (self.tested / (self.args.end - pos_test_begin))
+                    seconds=(time_now - time_test_begin).total_seconds() / (self.tested / (self.args.end - pos_test_begin))
                 )
                 print(
                     "\x1b[K{}B tested ({:.2%}), {}B/s, ~{} left\r".format(
                         prettyb(self.tested, 1024),
-                        (self.pos - self.args.begin)
-                        / (self.args.end - self.args.begin),
+                        (self.pos - self.args.begin) / (self.args.end - self.args.begin),
                         prettyb(
-                            (self.tested - pos_last_print)
-                            / (time_now - time_last_print).total_seconds(),
+                            (self.tested - pos_last_print) / (time_now - time_last_print).total_seconds(),
                             1024,
                         ),
                         strip_microseconds(estimated_end - time_now),
@@ -451,9 +405,7 @@ class HonestBT:
         print(
             "\x1b[K{}B tested, {}B/s in {}".format(
                 prettyb(self.tested, 1024),
-                prettyb(
-                    self.tested / (time_now - time_test_begin).total_seconds(), 1024
-                ),
+                prettyb(self.tested / (time_now - time_test_begin).total_seconds(), 1024),
                 strip_microseconds(time_now - time_test_begin),
             )
         )
@@ -465,11 +417,7 @@ class HonestBT:
             if random.random() < pct_fraction:
                 old_byte = data_bytearray[i]
                 new_byte = random.randint(0, 255)
-                print(
-                    "FUZZ: Changing byte {} from {:02x} to {:02x}".format(
-                        self.pos + i, old_byte, new_byte
-                    )
-                )
+                print("FUZZ: Changing byte {} from {:02x} to {:02x}".format(self.pos + i, old_byte, new_byte))
                 data_bytearray[i] = new_byte
         return bytes(data_bytearray)
 
@@ -481,22 +429,14 @@ class HonestBT:
         if not self.args.end:
             self.args.end = self.fh.file_size - 1
         if self.args.end <= 0:
-            self.args.parser.error(
-                "Cannot determine device size, specify --end of device size minus 1 byte"
-            )
+            self.args.parser.error("Cannot determine device size, specify --end of device size minus 1 byte")
 
         print("Key: {}".format(base64.b64encode(self.args.key).decode("UTF-8")))
-        print(
-            "Block size: {}B ({})".format(
-                prettyb(self.args.block_size, 1024), self.args.block_size
-            )
-        )
+        print("Block size: {}B ({})".format(prettyb(self.args.block_size, 1024), self.args.block_size))
         print("Begin: {}B ({})".format(prettyb(self.args.begin, 1024), self.args.begin))
         print("End: {}B ({})".format(prettyb(self.args.end, 1024), self.args.end))
 
-        self.cipher_block_size = AES.new(
-            self.args.key, AES.MODE_CTR, counter=Counter.new(128)
-        ).block_size
+        self.cipher_block_size = AES.new(self.args.key, AES.MODE_CTR, counter=Counter.new(128)).block_size
 
         self.write_data()
         self.test_data()
