@@ -1,0 +1,16 @@
+[project]
+name = "honestbt"
+authors = [
+    {name = "Ryan Finnie", email = "ryan@finnie.org"},
+]
+description = "Destructive tester which detects dishonest block devices"
+readme = "README.md"
+requires-python = ">=3.8"
+license = {text = "MPL-2.0"}
+dependencies = [
+    "pycryptodomex",
+]
+dynamic = ["version"]
+
+[tool.setuptools]
+script-files = ["honestbt"]
