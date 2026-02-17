@@ -17,7 +17,3 @@ script-files = ["honestbt"]
 
 [tool.black]
 line-length = 132
-
-# https://pypi.org/project/Flake8-pyproject/
-[tool.flake8]
-max-line-length = 132
