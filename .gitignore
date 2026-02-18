@@ -1,3 +1,8 @@
+# SPDX-PackageName: honestbt
+# SPDX-PackageSupplier: Ryan Finnie <ryan@finnie.org>
+# SPDX-PackageDownloadLocation: https://github.com/rfinnie/honestbt
+# SPDX-FileCopyrightText: © 2020 Ryan Finnie <ryan@finnie.org>
+# SPDX-License-Identifier: MPL-2.0
 MANIFEST
 
 # Byte-compiled / optimized / DLL files

@@ -14,3 +14,14 @@ It has the following applications:
 ## Current status
 
 "90% functionally done, throw it on GitHub."
+
+## License
+
+This document is provided under the following license:
+
+    SPDX-PackageName: honestbt
+    SPDX-PackageSupplier: Ryan Finnie <ryan@finnie.org>
+    SPDX-PackageDownloadLocation: https://github.com/rfinnie/honestbt
+    SPDX-FileComment: README
+    SPDX-FileCopyrightText: SPDX-FileCopyrightText: © 2019 Ryan Finnie <ryan@finnie.org>
+    SPDX-License-Identifier: CC-BY-SA-4.0
