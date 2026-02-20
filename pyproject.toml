@@ -21,5 +21,8 @@ dynamic = ["version"]
 [tool.setuptools]
 script-files = ["honestbt"]
 
+[tool.setuptools.packages.find]
+include = []
+
 [tool.black]
 line-length = 132
