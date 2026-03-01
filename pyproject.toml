@@ -12,7 +12,7 @@ authors = [
 description = "Destructive tester which detects dishonest block devices"
 readme = "README.md"
 requires-python = ">=3.8"
-license = {text = "MPL-2.0"}
+license = "MPL-2.0"
 dependencies = [
     "pycryptodomex",
 ]
