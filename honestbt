@@ -31,109 +31,6 @@ except AttributeError:
     random_sys = random
 
 
-def is_pow2(n):
-    return (n != 0) and ((n & (n - 1)) == 0)
-
-
-def strip_microseconds(td):
-    return td - datetime.timedelta(microseconds=td.microseconds)
-
-
-def prettyb(number, mode=1000, precision=2):
-    if mode == 1024:
-        tags = ["", "Ki", "Mi", "Gi", "Ti"]
-        divide = 1024
-    else:
-        tags = ["", "K", "M", "G", "T"]
-        divide = 1000
-    attag = 0
-    while number >= divide:
-        number = number / divide
-        attag += 1
-    return "{{:0.0{}f}} {{}}".format(precision).format(number, tags[attag])
-
-
-def parse_args(argv=None):
-    if argv is None:
-        argv = sys.argv
-
-    parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-
-    # Positionals
-    parser.add_argument("device", type=str, default=None, help="Device or file to destructively test")
-
-    # Options
-    parser.add_argument("--key", type=str, help="Base64-encoded 128/192/256 bit encryption key")
-    parser.add_argument(
-        "--fuzz",
-        type=float,
-        default=0.0,
-        help="Percentage probability to modify each written byte",
-    )
-    parser.add_argument(
-        "--begin",
-        type=int,
-        default=0,
-        help="Zero-indexed byte to begin at within the device",
-    )
-    parser.add_argument(
-        "--end",
-        type=int,
-        default=0,
-        help="Zero-indexed byte to end at within the device (default last byte; device size minus 1 byte)",
-    )
-    parser.add_argument(
-        "--block-size",
-        type=int,
-        default=1048576,
-        help="I/O block size in bytes, must be multiple of device logical block size",
-    )
-    parser.add_argument("--resume-write", type=int, default=-1, help="Byte to resume write mode")
-    parser.add_argument(
-        "--resume-test",
-        type=int,
-        default=-1,
-        help="Byte to resume test mode (skip write mode)",
-    )
-    parser.add_argument(
-        "--fake-rollover",
-        type=int,
-        default=0,
-        help="Beginning byte of simulated rollover device",
-    )
-    parser.add_argument(
-        "--fake-zeroed",
-        type=int,
-        default=0,
-        help="Beginning byte of simulated zeroed data",
-    )
-    parser.add_argument("--skip-test", action="store_true", help="Skip test entirely after write")
-
-    args = parser.parse_args(args=argv[1:])
-    args.parser = parser
-
-    if args.key:
-        args.key = base64.b64decode(args.key)
-    else:
-        args.key = bytes([random_sys.randint(0, 255) for _ in range(32)])
-
-    if (len(args.key) * 8) not in (128, 192, 256):
-        parser.error("Key must be 128, 192 or 256 bits")
-
-    for f, k in (
-        ("--begin", "begin"),
-        ("--resume-write", "resume_write"),
-        ("--resume-test", "resume_test"),
-    ):
-        v = getattr(args, k)
-        if v == parser.get_default(k):
-            continue
-        if not (v / args.block_size).is_integer():
-            parser.error("{}={} must be divisible by --block-size={}".format(f, v, args.block_size))
-
-    return args
-
-
 class FileMmap:
     def __init__(self, filename, block_size=1048576):
         self.block_size = block_size
@@ -179,45 +76,156 @@ class FileMmap:
 
 
 class HonestBT:
+    f_clear = "\x1b[K"
+    f_cr = "\r"
+    is_tty = sys.stdout.isatty()
+
     def __init__(self):
-        self.args = parse_args()
         self.pos = 0
         self.written = 0
         self.tested = 0
 
-    def print_resume(self, stage):
-        args = [
-            "--key={}".format(base64.b64encode(self.args.key).decode("UTF-8")),
-            "--resume-{}={}".format(stage, self.pos),
-        ]
-        arg_mappings = [
-            ("--block-size", "block_size"),
-            ("--begin", "begin"),
-            ("--end", "end"),
-            ("--fake-rollover", "fake_rollover"),
-            ("--fake-zeroed", "fake_zeroed"),
-            ("--fuzz", "fuzz"),
-        ]
-        if stage != "test":
-            arg_mappings.append(("--skip-test", "skip_test"))
-        for k, a in arg_mappings:
-            v = getattr(self.args, a)
-            if v == self.args.parser.get_default(a):
-                continue
-            if isinstance(v, bool):
-                args.append(k)
+    def parse_args(self, argv=None):
+        if argv is None:
+            argv = sys.argv
+
+        arguments = {}
+
+        def _add_argument(*args, **kwargs):
+            if "tostr" in kwargs:
+                tostr = kwargs["tostr"]
+                del kwargs["tostr"]
             else:
-                args.append("{}={}".format(k, v))
+                tostr = str
+            argument = parser.add_argument(*args, **kwargs)
+            argument.tostr = tostr
+            arguments[argument.dest] = argument
+
+        parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+
+        # Positionals
+        _add_argument("device", help="Device or file to destructively test")
+
+        # Options
+        _add_argument(
+            "--key",
+            type=base64.b64decode,
+            default=base64.b64encode(bytes([random_sys.randint(0, 255) for _ in range(32)])).decode("UTF-8"),
+            help="Base64-encoded 128/192/256 bit encryption key",
+            tostr=lambda x: base64.b64encode(x).decode("UTF-8"),
+        )
+        _add_argument(
+            "--fuzz",
+            type=float,
+            default="0.0",
+            help="Percentage probability to modify each written byte",
+        )
+        _add_argument(
+            "--begin",
+            type=int,
+            default="0",
+            help="Zero-indexed byte to begin at within the device",
+        )
+        _add_argument(
+            "--end",
+            type=int,
+            default="0",
+            help="Zero-indexed byte to end at within the device (default last byte; device size minus 1 byte)",
+        )
+        _add_argument(
+            "--block-size",
+            type=int,
+            default="1048576",
+            help="I/O block size in bytes, must be multiple of device logical block size",
+        )
+        _add_argument("--resume-write", type=int, default="-1", help="Byte to resume write mode")
+        _add_argument(
+            "--resume-test",
+            type=int,
+            default="-1",
+            help="Byte to resume test mode (skip write mode)",
+        )
+        _add_argument(
+            "--fake-rollover",
+            type=int,
+            default="0",
+            help="Beginning byte of simulated rollover device",
+        )
+        _add_argument(
+            "--fake-zeroed",
+            type=int,
+            default="0",
+            help="Beginning byte of simulated zeroed data",
+        )
+        _add_argument("--skip-test", action="store_true", help="Skip test entirely after write")
+
+        args = parser.parse_args(args=argv[1:])
+        args.parser = parser
+        args.arguments = arguments
+
+        if (len(args.key) * 8) not in (128, 192, 256):
+            parser.error("Key must be 128, 192 or 256 bits")
+
+        for dest in ("begin", "resume_write", "resume_test"):
+            v = getattr(args, dest)
+            if v == -1:
+                continue
+            if not (v / args.block_size).is_integer():
+                parser.error(
+                    "{}={} must be divisible by --block-size={}".format(arguments[dest].option_strings[0], v, args.block_size)
+                )
+
+        return args
+
+    def strip_microseconds(self, td):
+        return td - datetime.timedelta(microseconds=td.microseconds)
+
+    def prettyb(self, number, mode=1000, precision=2):
+        if mode == 1024:
+            tags = ["", "Ki", "Mi", "Gi", "Ti"]
+            divide = 1024
+        else:
+            tags = ["", "K", "M", "G", "T"]
+            divide = 1000
+        attag = 0
+        while number >= divide:
+            number = number / divide
+            attag += 1
+        return "{{:0.0{}f}} {{}}".format(precision).format(number, tags[attag])
+
+    def print_resume(self, stage, retest=False):
+        args = []
+        required_dests = ["key"]
+        for dest, argument in self.args.arguments.items():
+            if dest in ("resume_write", "resume_test"):
+                continue
+            if dest == "skip_test" and stage == "test":
+                continue
+            v = getattr(self.args, dest)
+            default_v = argument.default
+            if argument.const is not None:
+                if v != default_v:
+                    args.append(argument.option_strings[0])
+                continue
+            v_str = argument.tostr(v)
+            if default_v == v_str and dest not in required_dests:
+                continue
+            if len(argument.option_strings) == 0:
+                args.append(v_str)
+            else:
+                args.append("{}={}".format(argument.option_strings[0], v_str))
+        args.append("--resume-{}={}".format(stage, (0 if retest else self.pos)))
         print()
-        print("To resume:")
+        if retest:
+            print("To retest:")
+        else:
+            print("To resume:")
         print(
-            "{} {} {}".format(
+            "{} {}".format(
                 shlex.quote(sys.argv[0]),
                 " ".join([shlex.quote(x) for x in args]),
-                shlex.quote(self.args.device),
             )
         )
-        sys.exit(0)
 
     def write_data(self):
         if self.args.resume_test >= 0:
@@ -228,31 +236,31 @@ class HonestBT:
 
         self.pos = 0
         if self.args.begin:
-            print("Beginning at {}B, as requested".format(prettyb(self.args.begin, 1024)))
+            print("Beginning at {}B, as requested".format(self.prettyb(self.args.begin, 1024)))
             self.pos = self.args.begin
         if self.args.resume_write >= 0:
-            print("Resuming write at {}B, as requested".format(prettyb(self.args.resume_write, 1024)))
+            print("Resuming write at {}B, as requested".format(self.prettyb(self.args.resume_write, 1024)))
             self.pos = self.args.resume_write
         self.fh.seek(self.pos)
 
-        user_interrupted = False
+        user_interrupted = None
         try:
             self.write_data_loop()
         except IOError as e:
-            raise
             print()
             print(str(e))
             self.print_resume("write")
             raise
-        except KeyboardInterrupt:
-            user_interrupted = True
+        except KeyboardInterrupt as e:
+            user_interrupted = e
             print()
 
         print("Flushing")
         self.fh.flush()
-        print("Successfully wrote {}B".format(prettyb(self.written, 1024)))
+        print("Successfully wrote {}B".format(self.prettyb(self.written, 1024)))
         if user_interrupted:
             self.print_resume("write")
+            raise user_interrupted
 
     def write_data_loop(self):
         initial_value = int(self.pos / self.cipher_block_size)
@@ -268,6 +276,7 @@ class HonestBT:
         block_size = self.args.block_size
         zero_buf = bytes(block_size)
 
+        sys.stdout.flush()
         while True:
             if (self.pos + self.args.block_size) > self.args.end:
                 block_size = self.args.end - self.pos + 1
@@ -287,19 +296,22 @@ class HonestBT:
             if self.pos >= self.args.end:
                 break
             time_now = datetime.datetime.now()
-            if time_now >= (time_last_print + datetime.timedelta(seconds=1)):
+            if time_now >= (time_last_print + datetime.timedelta(seconds=(1 if self.is_tty else 60))):
                 estimated_end = time_write_begin + datetime.timedelta(
                     seconds=(time_now - time_write_begin).total_seconds() / (self.written / (self.args.end - pos_write_begin))
                 )
                 print(
-                    "\x1b[K{}B written ({:.2%}), {}B/s, ~{} left\r".format(
-                        prettyb(self.written, 1024),
+                    "{}{}B written ({:.2%}), {}B/s, ~{} left ({} ETA){}".format(
+                        (self.f_clear if self.is_tty else ""),
+                        self.prettyb(self.written, 1024),
                         (self.pos - self.args.begin) / (self.args.end - self.args.begin),
-                        prettyb(
+                        self.prettyb(
                             (self.written - pos_last_print) / (time_now - time_last_print).total_seconds(),
                             1024,
                         ),
-                        strip_microseconds(estimated_end - time_now),
+                        self.strip_microseconds(estimated_end - time_now),
+                        estimated_end.strftime("%H:%M"),
+                        (self.f_cr if self.is_tty else ""),
                     ),
                     end="",
                 )
@@ -308,10 +320,11 @@ class HonestBT:
                 pos_last_print = self.written
         time_now = datetime.datetime.now()
         print(
-            "\x1b[K{}B written, {}B/s in {}".format(
-                prettyb(self.written, 1024),
-                prettyb(self.written / (time_now - time_write_begin).total_seconds(), 1024),
-                strip_microseconds(time_now - time_write_begin),
+            "{}{}B written, {}B/s in {}".format(
+                (self.f_clear if self.is_tty else ""),
+                self.prettyb(self.written, 1024),
+                self.prettyb(self.written / (time_now - time_write_begin).total_seconds(), 1024),
+                self.strip_microseconds(time_now - time_write_begin),
             )
         )
 
@@ -326,10 +339,10 @@ class HonestBT:
         print("Testing")
 
         if self.args.begin:
-            print("Beginning at {}B, as requested".format(prettyb(self.args.begin, 1024)))
+            print("Beginning at {}B, as requested".format(self.prettyb(self.args.begin, 1024)))
             self.pos = self.args.begin
         if self.args.resume_test >= 0:
-            print("Resuming test at {}B, as requested".format(prettyb(self.args.resume_test, 1024)))
+            print("Resuming test at {}B, as requested".format(self.prettyb(self.args.resume_test, 1024)))
             self.pos = self.args.resume_test
         self.fh.seek(self.pos)
 
@@ -343,6 +356,8 @@ class HonestBT:
         except KeyboardInterrupt:
             print()
             self.print_resume("test")
+            raise
+        self.print_resume("test", retest=True)
 
     def test_data_loop(self):
         initial_value = int(self.pos / self.cipher_block_size)
@@ -358,6 +373,7 @@ class HonestBT:
         block_size = self.args.block_size
         zero_buf = bytes(block_size)
 
+        sys.stdout.flush()
         while True:
             if (self.pos + self.args.block_size) > self.args.end:
                 block_size = self.args.end - self.pos + 1
@@ -389,14 +405,17 @@ class HonestBT:
                     seconds=(time_now - time_test_begin).total_seconds() / (self.tested / (self.args.end - pos_test_begin))
                 )
                 print(
-                    "\x1b[K{}B tested ({:.2%}), {}B/s, ~{} left\r".format(
-                        prettyb(self.tested, 1024),
+                    "{}{}B tested ({:.2%}), {}B/s, ~{} left ({} ETA){}".format(
+                        (self.f_clear if self.is_tty else ""),
+                        self.prettyb(self.tested, 1024),
                         (self.pos - self.args.begin) / (self.args.end - self.args.begin),
-                        prettyb(
+                        self.prettyb(
                             (self.tested - pos_last_print) / (time_now - time_last_print).total_seconds(),
                             1024,
                         ),
-                        strip_microseconds(estimated_end - time_now),
+                        self.strip_microseconds(estimated_end - time_now),
+                        estimated_end.strftime("%H:%M"),
+                        (self.f_cr if self.is_tty else ""),
                     ),
                     end="",
                 )
@@ -405,10 +424,11 @@ class HonestBT:
                 pos_last_print = self.tested
         time_now = datetime.datetime.now()
         print(
-            "\x1b[K{}B tested, {}B/s in {}".format(
-                prettyb(self.tested, 1024),
-                prettyb(self.tested / (time_now - time_test_begin).total_seconds(), 1024),
-                strip_microseconds(time_now - time_test_begin),
+            "{}{}B tested, {}B/s in {}".format(
+                (self.f_clear if self.is_tty else ""),
+                self.prettyb(self.tested, 1024),
+                self.prettyb(self.tested / (time_now - time_test_begin).total_seconds(), 1024),
+                self.strip_microseconds(time_now - time_test_begin),
             )
         )
 
@@ -424,6 +444,8 @@ class HonestBT:
         return bytes(data_bytearray)
 
     def main(self):
+        self.args = self.parse_args()
+
         print("Testing {}".format(self.args.device))
 
         self.fh = FileMmap(self.args.device, self.args.block_size)
@@ -434,16 +456,18 @@ class HonestBT:
             self.args.parser.error("Cannot determine device size, specify --end of device size minus 1 byte")
 
         print("Key: {}".format(base64.b64encode(self.args.key).decode("UTF-8")))
-        print("Block size: {}B ({})".format(prettyb(self.args.block_size, 1024), self.args.block_size))
-        print("Begin: {}B ({})".format(prettyb(self.args.begin, 1024), self.args.begin))
-        print("End: {}B ({})".format(prettyb(self.args.end, 1024), self.args.end))
+        print("Block size: {}B ({})".format(self.prettyb(self.args.block_size, 1024), self.args.block_size))
+        print("Begin: {}B ({})".format(self.prettyb(self.args.begin, 1024), self.args.begin))
+        print("End: {}B ({})".format(self.prettyb(self.args.end, 1024), self.args.end))
 
         self.cipher_block_size = AES.new(self.args.key, AES.MODE_CTR, counter=Counter.new(128)).block_size
 
-        self.write_data()
-        self.test_data()
+        try:
+            self.write_data()
+            self.test_data()
+        except KeyboardInterrupt:
+            return
 
 
 if __name__ == "__main__":
-    honestbt = HonestBT()
-    honestbt.main()
+    sys.exit(HonestBT().main())
