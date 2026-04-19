@@ -32,10 +32,10 @@ except AttributeError:
 
 
 class FileMmap:
-    def __init__(self, filename, block_size=1048576):
+    def __init__(self, filename, block_size=1048576, direct=False):
         self.block_size = block_size
         flags = os.O_RDWR
-        if hasattr(os, "O_DIRECT"):
+        if hasattr(os, "O_DIRECT") and direct:
             flags |= os.O_DIRECT
         if hasattr(os, "O_EXCL"):
             flags |= os.O_EXCL
@@ -158,6 +158,7 @@ class HonestBT:
             help="Beginning byte of simulated zeroed data",
         )
         _add_argument("--skip-test", action="store_true", help="Skip test entirely after write")
+        _add_argument("--direct", action="store_true", help="Use direct I/O")
 
         args = parser.parse_args(args=argv[1:])
         args.parser = parser
@@ -448,7 +449,7 @@ class HonestBT:
 
         print("Testing {}".format(self.args.device))
 
-        self.fh = FileMmap(self.args.device, self.args.block_size)
+        self.fh = FileMmap(self.args.device, self.args.block_size, direct=self.args.direct)
 
         if not self.args.end:
             self.args.end = self.fh.file_size - 1
