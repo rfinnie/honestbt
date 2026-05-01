@@ -11,12 +11,16 @@ authors = [
 ]
 description = "Destructive tester which detects dishonest block devices"
 readme = "README.md"
-requires-python = ">=3.8"
+requires-python = ">=3.10"
 license = "MPL-2.0"
 dependencies = [
     "pycryptodomex",
 ]
 dynamic = ["version"]
+
+[build-system]
+requires = ["setuptools>=59.6.0"]
+build-backend = "setuptools.build_meta"
 
 [tool.setuptools]
 script-files = ["honestbt"]
