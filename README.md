@@ -1,5 +1,8 @@
 # honestbt, The Honest Block Tester
 
+[![Git forge repository](https://img.shields.io/badge/git-forge-orange?logo=forgejo)](https://forge.colobox.com/rfinnie/honestbt)
+[![CI pipeline status](https://woodpecker.colobox.com/api/badges/45/status.svg)](https://woodpecker.colobox.com/repos/45)
+
 ```honestbt``` is a program which writes AES-CTR-encrypted data (using a random or specified key) to a block device, then reads back, decrypts and verifies.  It is designed to write seemingly random, non-patterned data but does not need a full reference copy to verify.
 
 It has the following applications:
